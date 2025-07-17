@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Live Tracking: Reefer Van (by VIN)</title>
+  <title>Live Tracking: Gateway G758-TEE-SFK</title>
   <meta charset="utf-8" />
   <style>
     #map { height: 100vh; width: 100vw; margin: 0; padding: 0; }
@@ -14,57 +14,47 @@
   <div id="map"></div>
 
   <script>
-    const map = L.map('map').setView([27.5, -83.5], 6); // Florida-wide view
+    const map = L.map('map').setView([27.5, -83.5], 6); // Zoomed to Florida
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: 'Map data © OpenStreetMap contributors'
     }).addTo(map);
 
-    let liveLayer = null;
     const token = "samsara_api_p4QzPVGcaGvyLt4VgrI6YyslaPxycD";
-    const targetVIN = "1FTBW1X85PKA07078";
+    const gatewaySerial = "G758-TEE-SFK";
+    let liveLayer = null;
 
     async function fetchVanLocation() {
       try {
-        // Step 1: Get list of vehicles
-        const vehicleResponse = await fetch("https://api.samsara.com/fleet/vehicles", {
+        // Step 1: Fetch all vehicles
+        const vehiclesRes = await fetch("https://api.samsara.com/fleet/vehicles", {
           headers: {
             "Authorization": `Bearer ${token}`
           }
         });
 
-        if (!vehicleResponse.ok) {
-          console.error("❌ Failed to fetch vehicle list");
+        const vehicleData = await vehiclesRes.json();
+        const matchedVehicle = vehicleData.data.find(v => v.gateway?.serial === gatewaySerial);
+
+        if (!matchedVehicle) {
+          console.warn("❌ No vehicle found with that gateway ID");
           return;
         }
 
-        const vehicleData = await vehicleResponse.json();
-        const reeferVan = vehicleData.data.find(vehicle => vehicle.vin === targetVIN);
+        const vehicleId = matchedVehicle.id;
 
-        if (!reeferVan) {
-          console.warn("⚠️ Vehicle with that VIN not found.");
-          return;
-        }
-
-        const vehicleId = reeferVan.id;
-
-        // Step 2: Get latest location
-        const locationResponse = await fetch(`https://api.samsara.com/fleet/vehicles/${vehicleId}/locations`, {
+        // Step 2: Get current location of that vehicle
+        const locationRes = await fetch(`https://api.samsara.com/fleet/vehicles/${vehicleId}`, {
           headers: {
             "Authorization": `Bearer ${token}`
           }
         });
 
-        if (!locationResponse.ok) {
-          console.error("❌ Failed to fetch vehicle location");
-          return;
-        }
+        const locationData = await locationRes.json();
+        const location = locationData?.lastKnownLocation;
 
-        const locationData = await locationResponse.json();
-        const location = locationData.data?.[0]?.location;
-
-        if (location && location.latitude && location.longitude) {
-          const lat = location.latitude;
-          const lon = location.longitude;
+        if (location && location.lat && location.lon) {
+          const lat = location.lat;
+          const lon = location.lon;
 
           const geojsonFeature = {
             type: "Feature",
@@ -73,7 +63,7 @@
               coordinates: [lon, lat]
             },
             properties: {
-              title: "Reefer Van"
+              title: "Reefer Van (by Gateway)"
             }
           };
 
@@ -86,16 +76,19 @@
               layer.bindPopup(feature.properties.title).openPopup();
             }
           }).addTo(map);
+
+          map.setView([lat, lon]); // Optional: auto-follow
         } else {
-          console.warn("⚠️ No valid location found for this VIN.");
+          console.warn("⚠️ No location found for this vehicle.");
         }
-      } catch (err) {
-        console.error("🚨 Error during fetch:", err);
+
+      } catch (error) {
+        console.error("🚨 Error fetching van location:", error);
       }
     }
 
-    fetchVanLocation(); // Initial fetch
-    setInterval(fetchVanLocation, 10000); // Every 10 sec
+    fetchVanLocation();
+    setInterval(fetchVanLocation, 10000);
   </script>
 </body>
 </html>
