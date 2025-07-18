@@ -1,46 +1,65 @@
-<script>
-  const map = L.map('map').setView([27.5, -83.5], 6); // Zoomed to Florida
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: 'Map data © OpenStreetMap contributors'
-  }).addTo(map);
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Live Tracking: Gateway G758-TEE-SFK</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    #map { height: 100vh; width: 100vw; margin: 0; padding: 0; }
+    html, body { height: 100%; margin: 0; }
+  </style>
 
-  let liveLayer = null;
+  <!-- ✅ Make sure Leaflet CSS and JS are loaded BEFORE your script -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+</head>
+<body>
+  <div id="map"></div>
 
-  async function fetchVanLocation() {
-    try {
-      const response = await fetch("https://polished-water-fc63.huntersharp-qcc.workers.dev/");
-      const data = await response.json();
-      const lat = data.latitude;
-      const lon = data.longitude;
+  <script>
+    const map = L.map('map').setView([27.5, -83.5], 6); // Center on Florida
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: 'Map data © OpenStreetMap contributors'
+    }).addTo(map);
 
-      const geojsonFeature = {
-        type: "Feature",
-        geometry: {
-          type: "Point",
-          coordinates: [lon, lat]
-        },
-        properties: {
-          title: data.label || "Reefer Van"
+    let liveLayer = null;
+
+    async function fetchVanLocation() {
+      try {
+        const response = await fetch("https://polished-water-fc63.huntersharp-qcc.workers.dev/");
+        const data = await response.json();
+        const lat = data.latitude;
+        const lon = data.longitude;
+
+        const geojsonFeature = {
+          type: "Feature",
+          geometry: {
+            type: "Point",
+            coordinates: [lon, lat]
+          },
+          properties: {
+            title: "Reefer Van"
+          }
+        };
+
+        if (liveLayer) {
+          map.removeLayer(liveLayer);
         }
-      };
 
-      if (liveLayer) {
-        map.removeLayer(liveLayer);
+        liveLayer = L.geoJSON(geojsonFeature, {
+          onEachFeature: function (feature, layer) {
+            layer.bindPopup(feature.properties.title).openPopup();
+          }
+        }).addTo(map);
+
+        map.setView([lat, lon]); // Follow van
+      } catch (error) {
+        console.error("Error fetching location:", error);
       }
-
-      liveLayer = L.geoJSON(geojsonFeature, {
-        onEachFeature: function (feature, layer) {
-          layer.bindPopup(feature.properties.title).openPopup();
-        }
-      }).addTo(map);
-
-      map.setView([lat, lon]); // Optional: auto-follow
-
-    } catch (error) {
-      console.error("🚨 Error fetching van location:", error);
     }
-  }
 
-  fetchVanLocation(); // Load first time
-  setInterval(fetchVanLocation, 10000); // Refresh every 10 sec
-</script>
+    fetchVanLocation();
+    setInterval(fetchVanLocation, 10000);
+  </script>
+</body>
+</html>
